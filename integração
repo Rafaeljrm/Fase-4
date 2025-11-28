@@ -1,23 +1,51 @@
 /* control_logic.h */
+#ifndef CONTROL_LOGIC_H
+#define CONTROL_LOGIC_H
+
+#include <stdint.h>
+
+// --- Configurações de Tempo ---
+#define MODBUS_DATA_TIMEOUT_MS  2000 // Tempo máx sem dados do CLP
+#define HYSTERESIS_MS           2000 // Tempo mín entre trocas de estado da bomba
+#define CONTROL_CYCLE_MS        100  // Ciclo da tarefa
+
+// --- Códigos de Erro de Sensor (Protocolo Interno) ---
+#define SENSOR_ERROR_VAL        0xFF // Valor vindo do Modbus indicando falha
+
+// --- Enumeração de Alarmes (Prioridade implícita pela ordem de verificação) ---
+typedef enum {
+    ALARM_NONE = 0,             // Operação Normal
+    ALARM_LEVEL_HIGH,           // Aviso: Tanque Cheio
+    ALARM_LEVEL_LOW,            // Crítico: Nível Baixo
+    ALARM_SENSOR_INCONSISTENT,  // Erro: Ambos sensores ativos
+    ALARM_SENSOR_FAIL,          // Erro: Leitura inválida
+    ALARM_COMMS_FAIL,           // Erro: Timeout Modbus
+    ALARM_INTERNAL_TX_FAIL      // Erro: Fila cheia
+} AlarmType_t;
+
+// --- Estruturas de Dados ---
 
 typedef struct {
-    // Entradas lidas do CLP via Modbus [cite: 28-32]
-    uint8_t sensor_nivel_alto; // 0=Inativo, 1=Ativo
-    uint8_t sensor_nivel_baixo; // 0=Inativo, 1=Ativo
-    uint8_t status_bomba_clp;   // Feedback real da bomba
-    uint8_t falha_clp;          // Flag de erro do próprio CLP
-    uint8_t conexao_ok;         // Flag interna: 1=Conectado, 0=Erro Modbus
+    uint8_t sensor_nivel_alto;  // 0, 1 ou SENSOR_ERROR_VAL
+    uint8_t sensor_nivel_baixo; // 0, 1 ou SENSOR_ERROR_VAL
+    uint8_t status_bomba_clp;   // Feedback real
 } ModbusData_t;
 
 typedef struct {
-    // Comandos vindos da IHM (LVGL) [cite: 39-43]
     uint8_t modo_operacao;      // 0=Manual, 1=Automático
     uint8_t comando_manual;     // 0=Desligar, 1=Ligar
-    uint8_t reset_alarmes;      // 1=Resetar
+    uint8_t confirm_acionar;    // 1=Operador confirmou ação (Segurança 2E)
+    uint8_t reset_alarmes;      // 1=Solicitação de Reset
 } HmiCommands_t;
 
 typedef struct {
-    // Saídas para a IHM e Modbus
-    uint8_t acionar_bomba;      // Comando para enviar ao Modbus
-    uint8_t alarme_ativo;       // 0=OK, 1=Nível Baixo, 2=Nível Alto, 3=Erro Com
+    uint8_t acionar_bomba;      // Comando efetivo para o CLP
+    AlarmType_t alarme_ativo;   // Código do alarme atual para IHM
+    uint8_t comms_ok;           // Status da conexão para IHM
 } SystemStatus_t;
+
+// Protótipos de funções auxiliares (simulação do AlarmManager)
+void AlarmManager_Raise(AlarmType_t alarm);
+void AlarmManager_ResetAll(void);
+
+#endif
